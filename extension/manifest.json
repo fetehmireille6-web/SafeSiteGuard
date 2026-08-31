@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "SafeSite Guard",
+  "version": "1.0.0",
+  "description": "A basic browser extension scaffold for SafeSite Guard.",
+  "permissions": ["storage", "webNavigation", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "SafeSite Guard",
+    "default_popup": "popup.html"
+  }
+}

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>SafeSite Guard Warning</title>
+    <style>
+      :root {
+        --bg: rgba(253, 237, 248, 0.8);
+        --panel: #111827;
+        --panel-border: #dcc2e1;
+        --text: #f8fafc;
+        --muted: #d1d5db;
+        --danger: #b91c1c;
+        --warning: #d97706;
+        --safe: #166534;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      body {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .overlay {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(2, 6, 23, 0.72);
+      }
+
+      .card {
+        width: min(520px, 92vw);
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 18px;
+        padding: 28px 24px;
+        box-shadow: 0 30px 70px rgba(0,0,0,0.45);
+        max-height: 88vh;
+        overflow-y: auto;
+      }
+
+      .badge {
+        display: inline-block;
+        background: var(--danger);
+        color: white;
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 18px;
+        box-shadow: 0 0 18px rgba(185, 28, 28, 0.45);
+      }
+
+      .badge.warning {
+        background: var(--warning);
+        box-shadow: 0 0 18px rgba(217, 119, 6, 0.4);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 28px;
+        font-weight: 800;
+      }
+
+      p {
+        color: var(--muted);
+        margin: 8px 0;
+        line-height: 1.5;
+      }
+
+      .url {
+        background: #1f2937;
+        border: 1px solid #374151;
+        border-radius: 10px;
+        padding: 10px 12px;
+        word-break: break-all;
+        margin: 18px 0;
+        color: #fca5a5;
+        font-size: 14px;
+      }
+
+      .reasons {
+        margin: 12px 0 6px;
+        padding: 0;
+        list-style: none;
+      }
+
+      .reasons li {
+        background: #1f2937;
+        border: 1px solid #374151;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .reasons li::before {
+        content: "⚠ ";
+        color: var(--warning);
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      button {
+        flex: 1;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 15px;
+        font-weight: 800;
+        cursor: pointer;
+        pointer-events: auto;
+        transition: transform 0.15s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+        transform: none;
+      }
+
+      .back {
+        background: #e5e7eb;
+        color: #111827;
+      }
+
+      .continue {
+        background: #fbbf24;
+        color: #111827;
+      }
+
+      .status-note {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-top: 10px;
+        min-height: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="overlay">
+      <div class="card">
+        <div class="badge" id="verdict">DANGEROUS</div>
+        <h1>SafeSite Guard Warning</h1>
+        <p id="message">This site has been flagged as dangerous and is blocked.</p>
+        <div class="url" id="targetUrl">Loading...</div>
+
+        <ul class="reasons" id="reasonsList"></ul>
+
+        <div class="actions">
+          <button class="back" id="goBack" type="button">Go back</button>
+          <button class="continue" id="continueAnyways" type="button">Continue anyway</button>
+        </div>
+        <div class="status-note" id="statusNote"></div>
+      </div>
+    </div>
+
+    <script src="warning.js"></script>
+  </body>
+</html>
