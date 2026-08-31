@@ -1,8 +1,20 @@
+const DEFAULT_BACKEND_URL = "http://localhost:3000";
+
 const BADGE_COLORS = {
   safe: "#16a34a",
   caution: "#d97706",
   dangerous: "#dc2626"
 };
+
+async function getBackendBaseUrl() {
+  try {
+    const data = await chrome.storage.local.get("backendUrl");
+    const configured = data.backendUrl || DEFAULT_BACKEND_URL;
+    return String(configured).replace(/\/+$/, "");
+  } catch {
+    return DEFAULT_BACKEND_URL;
+  }
+}
 
 function normalizeVerdict(result) {
   if (!result) return "caution";
@@ -144,7 +156,8 @@ async function checkUrlForTab(tabId, url) {
   }
 
   try {
-    const response = await fetch("http://localhost:3000/check", {
+    const backendUrl = await getBackendBaseUrl();
+    const response = await fetch(`${backendUrl}/check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url })

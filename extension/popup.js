@@ -1,3 +1,15 @@
+const DEFAULT_BACKEND_URL = 'http://localhost:3000';
+
+async function getBackendBaseUrl() {
+  try {
+    const data = await chrome.storage.local.get('backendUrl');
+    const configured = data.backendUrl || DEFAULT_BACKEND_URL;
+    return String(configured).replace(/\/+$/, '');
+  } catch {
+    return DEFAULT_BACKEND_URL;
+  }
+}
+
 function normalizeVerdict(result) {
   if (!result) return 'caution';
   if (result.verdict) return result.verdict.toLowerCase();
@@ -31,7 +43,8 @@ async function loadResult() {
     let result = (await chrome.storage.session.get(sessionKey))[sessionKey];
 
     if (!result || !result.verdict) {
-      const response = await fetch('http://localhost:3000/check', {
+      const backendUrl = await getBackendBaseUrl();
+      const response = await fetch(`${backendUrl}/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: tab.url })
