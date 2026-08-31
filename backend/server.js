@@ -3,7 +3,11 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
+app.options("*", cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {

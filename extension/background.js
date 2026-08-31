@@ -219,25 +219,21 @@ function createWarningUrl(target, previous, result = null, state = null) {
     `&reasons=${encodeURIComponent(JSON.stringify(result.reasons || []))}`;
 }
 
-chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-  if (details.frameId !== 0) return;
-  if (!isCheckableUrl(details.url)) return;
-  if (isOwnExtensionUrl(details.url)) return;
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete") return;
+  if (!tab || !tab.url) return;
+  if (!isCheckableUrl(tab.url)) return;
+  if (isOwnExtensionUrl(tab.url)) return;
 
-  chrome.tabs.get(details.tabId).then(async (tab) => {
-    const previous = tab && tab.url && !isOwnExtensionUrl(tab.url) && tab.url !== details.url
-      ? tab.url
+  chrome.tabs.get(tabId).then(async (currentTab) => {
+    const previous = currentTab && currentTab.url && !isOwnExtensionUrl(currentTab.url) && currentTab.url !== tab.url
+      ? currentTab.url
       : "";
 
-    pendingPreviousUrls.set(details.tabId, previous);
+    pendingPreviousUrls.set(tabId, previous);
+  }).catch((error) => console.error("Could not track previous page", error));
 
-    if (tab && tab.url && !isOwnExtensionUrl(tab.url)) {
-      const warningUrl = createWarningUrl(details.url, previous, null, "checking");
-      await chrome.tabs.update(details.tabId, { url: warningUrl });
-    }
-  }).catch((error) => console.error("Could not show analysis screen", error));
-
-  checkUrlForTab(details.tabId, details.url);
+  checkUrlForTab(tabId, tab.url);
 });
 
 // --- Messages from warning.html -----------------------------------------
