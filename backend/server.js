@@ -140,6 +140,18 @@ async function checkDomainAge(domain) {
     };
   }
 }
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+
+app.get("/", (req, res) => {
+  res.json({
+    name: "SafeSite Guard API",
+    status: "running",
+    endpoints: ["/check", "/health", "/test-age", "/test-tls", "/test-heuristics"]
+  });
+});
+
 app.get("/test-age", async (req, res) => {
   const result = await checkDomainAge("https://example.com");
   res.json(result);
