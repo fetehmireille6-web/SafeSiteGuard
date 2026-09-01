@@ -5,14 +5,16 @@
     <title>SafeSite Guard Warning</title>
     <style>
       :root {
-        --bg: rgba(253, 237, 248, 0.8);
-        --panel: #111827;
-        --panel-border: #dcc2e1;
-        --text: #f8fafc;
-        --muted: #d1d5db;
-        --danger: #b91c1c;
-        --warning: #d97706;
-        --safe: #166534;
+        --bg: #021c2d;
+        --panel: rgba(9, 28, 43, 0.94);
+        --panel-border: rgba(116, 146, 175, 0.4);
+        --text: #edf6ff;
+        --muted: #d5dfec;
+        --danger: #de4c4c;
+        --danger-dark: #c63d3d;
+        --warning: #f2c94c;
+        --soft: #16324a;
+        --button: #f7cf4a;
       }
 
       * { box-sizing: border-box; }
@@ -27,8 +29,6 @@
       }
 
       body {
-        position: fixed;
-        inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -41,118 +41,99 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(2, 6, 23, 0.72);
+        background: transparent;
       }
 
       .card {
-        width: min(520px, 92vw);
+        width: min(540px, 92vw);
         background: var(--panel);
         border: 1px solid var(--panel-border);
-        border-radius: 18px;
-        padding: 28px 24px;
-        box-shadow: 0 30px 70px rgba(0,0,0,0.45);
-        max-height: 88vh;
+        border-radius: 14px;
+        padding: 18px 18px 16px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+        max-height: 90vh;
         overflow-y: auto;
       }
 
       .badge {
         display: inline-block;
-        background: var(--danger);
-        color: white;
-        padding: 8px 14px;
-        border-radius: 999px;
+        background: linear-gradient(180deg, var(--danger) 0%, var(--danger-dark) 100%);
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 8px;
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        margin-bottom: 18px;
-        box-shadow: 0 0 18px rgba(185, 28, 28, 0.45);
+        margin-bottom: 14px;
+        border: 1px solid rgba(255,255,255,0.14);
       }
 
       .badge.warning {
-        background: var(--warning);
-        box-shadow: 0 0 18px rgba(217, 119, 6, 0.4);
+        background: linear-gradient(180deg, #f3c74b 0%, #d8a61b 100%);
+        color: #1d1d1d;
       }
 
       h1 {
-        margin: 0 0 12px;
-        font-size: 28px;
-        font-weight: 800;
+        display: none;
       }
 
       p {
         color: var(--muted);
-        margin: 8px 0;
+        margin: 0 0 12px;
         line-height: 1.5;
+        font-size: 13px;
       }
 
       .url {
-        background: #1f2937;
-        border: 1px solid #374151;
-        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(147, 170, 196, 0.28);
+        border-radius: 8px;
         padding: 10px 12px;
         word-break: break-all;
-        margin: 18px 0;
-        color: #fca5a5;
-        font-size: 14px;
+        margin: 0 0 12px;
+        color: #d6e7f8;
+        font-size: 13px;
       }
 
       .reasons {
-        margin: 12px 0 6px;
-        padding: 0;
-        list-style: none;
+        margin: 8px 0 0;
+        padding: 0 0 0 18px;
+        list-style: disc;
       }
 
       .reasons li {
-        background: #1f2937;
-        border: 1px solid #374151;
-        border-radius: 8px;
-        padding: 8px 12px;
-        margin-bottom: 8px;
-        font-size: 13px;
         color: var(--muted);
-      }
-
-      .reasons li::before {
-        content: "⚠ ";
-        color: var(--warning);
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 4px 0;
       }
 
       .actions {
         display: flex;
         gap: 12px;
-        margin-top: 24px;
+        margin-top: 14px;
       }
 
       button {
         flex: 1;
-        border: none;
-        border-radius: 10px;
+        border: 1px solid rgba(147, 170, 196, 0.35);
+        border-radius: 8px;
         padding: 12px 14px;
-        font-size: 15px;
-        font-weight: 800;
+        font-size: 14px;
+        font-weight: 700;
         cursor: pointer;
         pointer-events: auto;
-        transition: transform 0.15s ease;
-      }
-
-      button:hover {
-        transform: translateY(-1px);
-      }
-
-      button:disabled {
-        opacity: 0.6;
-        cursor: default;
-        transform: none;
       }
 
       .back {
-        background: #e5e7eb;
-        color: #111827;
+        background: rgba(147, 170, 196, 0.08);
+        color: #edf6ff;
       }
 
       .continue {
-        background: #fbbf24;
-        color: #111827;
+        background: var(--button);
+        color: #1c1c1c;
+        border-color: rgba(255,255,255,0.15);
       }
 
       .status-note {

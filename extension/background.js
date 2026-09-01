@@ -40,6 +40,64 @@ function isCheckableUrl(url) {
   return true;
 }
 
+function shouldBlockWarning(verdict, isVerified = true, url = "", isUserAllowed = false) {
+  if (!isVerified) return false;
+  if (isUserAllowed) return false;
+
+  const normalized = String(verdict || "").trim().toLowerCase();
+  if (normalized === "caution" || normalized === "dangerous") {
+    return true;
+  }
+
+  return /^http:\/\//i.test(String(url || ""));
+}
+
+function getFastDangerIndicators(url) {
+  if (!isCheckableUrl(url)) {
+    return null;
+  }
+
+  const hostname = getHostname(url);
+  if (!hostname) {
+    return null;
+  }
+
+  if (/^http:\/\//i.test(url)) {
+    return {
+      verdict: "dangerous",
+      score: 70,
+      reasons: ["Website is using plain HTTP instead of HTTPS"]
+    };
+  }
+
+  if (hostname.includes("xn--") || hostname.includes("@")) {
+    return {
+      verdict: "dangerous",
+      score: 75,
+      reasons: ["Suspicious hostname pattern detected before page load"]
+    };
+  }
+
+  if (/\d+\.\d+\.\d+\.\d+/.test(hostname)) {
+    return {
+      verdict: "dangerous",
+      score: 80,
+      reasons: ["IP address used instead of a normal hostname"]
+    };
+  }
+
+  const suspiciousTokens = ["login", "secure", "account", "verify", "update", "billing", "confirm", "security", "support", "wallet", "payment"];
+  if (suspiciousTokens.some((token) => hostname.includes(token))) {
+    return {
+      verdict: "caution",
+      score: 45,
+      reasons: ["Hostname resembles a login or account-related phishing pattern"]
+    };
+  }
+
+  return null;
+}
+
 const pendingPreviousUrls = new Map();
 
 async function getTrustedHosts() {
@@ -156,10 +214,12 @@ async function checkUrlForTab(tabId, url) {
 
     const result = await response.json();
     result.verdict = normalizeVerdict(result);
+    result.verified = true;
     await chrome.storage.session.set({ [tabKey]: result });
     await updateBadge(tabId, result.verdict, result.score);
 
-    if (["caution", "dangerous"].includes(result.verdict)) {
+    const certificateState = result?.tls?.status || result?.status || "";
+    if (shouldBlockWarning(result.verdict, result.verified, url, false, certificateState)) {
       const currentTab = await chrome.tabs.get(tabId);
       const previous = pendingPreviousUrls.get(tabId) || "";
       pendingPreviousUrls.delete(tabId);
@@ -178,30 +238,17 @@ async function checkUrlForTab(tabId, url) {
     }
   } catch (error) {
     console.error("Error checking URL for tab", tabId, error);
-    await chrome.storage.session.set({
-      [tabKey]: {
-        url,
-        score: 0,
-        verdict: "caution",
-        reasons: ["Backend unavailable — could not verify this site right now"]
-      }
-    });
-    await updateBadge(tabId, "caution", "?");
+    const fallback = {
+      url,
+      score: 0,
+      verdict: "safe",
+      verified: false,
+      reasons: ["Backend unavailable — could not verify this site right now"]
+    };
 
-    if (pendingPreviousUrls.has(tabId)) {
-      const previous = pendingPreviousUrls.get(tabId);
-      pendingPreviousUrls.delete(tabId);
-      const currentTab = await chrome.tabs.get(tabId);
-      if (currentTab && currentTab.url === url) {
-        await chrome.tabs.update(tabId, {
-          url: createWarningUrl(url, previous, {
-            verdict: "caution",
-            score: 0,
-            reasons: ["Backend unavailable — could not verify this site right now"]
-          })
-        });
-      }
-    }
+    await chrome.storage.session.set({ [tabKey]: fallback });
+    await updateBadge(tabId, "safe", 0);
+    pendingPreviousUrls.delete(tabId);
   }
 }
 
@@ -218,6 +265,31 @@ function createWarningUrl(target, previous, result = null, state = null) {
     `&score=${encodeURIComponent(result.score || 0)}` +
     `&reasons=${encodeURIComponent(JSON.stringify(result.reasons || []))}`;
 }
+
+chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+  if (!details || !details.url || details.frameId !== 0) return;
+  if (!isCheckableUrl(details.url)) return;
+  if (isOwnExtensionUrl(details.url)) return;
+
+  const hostname = getHostname(details.url);
+  if (!hostname) return;
+
+  if (await isHostTrusted(hostname)) return;
+  if (await isTabTemporarilyAllowed(details.tabId, hostname)) return;
+
+  const fastSignal = getFastDangerIndicators(details.url);
+  if (!fastSignal) return;
+
+  const warningUrl = createWarningUrl(details.url, "", {
+    verdict: fastSignal.verdict,
+    score: fastSignal.score,
+    reasons: fastSignal.reasons
+  });
+
+  chrome.tabs.update(details.tabId, { url: warningUrl }).catch((error) => {
+    console.error("Could not redirect dangerous page before load", error);
+  });
+}, { url: [{ schemes: ["http", "https"] }] });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;

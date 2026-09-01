@@ -7,7 +7,7 @@ app.use(cors({
   origin: true,
   credentials: true
 }));
-app.options("*", cors({ origin: true, credentials: true }));
+app.options(/.*/, cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
@@ -192,6 +192,34 @@ function certHostnameMatches(cert, host) {
   return names.some((name) => hostMatchesCertName(host, name));
 }
 
+function getCertificateState(cert, socket) {
+  if (!cert) {
+    return socket && socket.authorized ? "valid" : "invalid";
+  }
+
+  const now = Date.now();
+  const validFrom = cert.valid_from ? new Date(cert.valid_from).getTime() : null;
+  const validTo = cert.valid_to ? new Date(cert.valid_to).getTime() : null;
+
+  if (cert.revoked === true || /revoked/i.test(String(cert.reason || ""))) {
+    return "revoked";
+  }
+
+  if (validFrom !== null && validFrom > now) {
+    return "not-yet-valid";
+  }
+
+  if (validTo !== null && validTo < now) {
+    return "expired";
+  }
+
+  if (!socket || !socket.authorized) {
+    return "invalid";
+  }
+
+  return "valid";
+}
+
 async function checkTlsCert(domain) {
   let host = domain;
 
@@ -212,18 +240,26 @@ async function checkTlsCert(domain) {
       },
       () => {
         const cert = socket.getPeerCertificate();
+        const state = getCertificateState(cert, socket);
 
         const result = {
           domain: host,
           validFrom: cert.valid_from || null,
           validTo: cert.valid_to || null,
+          status: state,
           authorized: socket.authorized || false,
           subject: cert.subject || null,
           issuer: cert.issuer || null,
           hostnameMatch: cert && (cert.subjectaltname || cert.subject) ? certHostnameMatches(cert, host) : false,
-          reason: socket.authorized
+          reason: state === "valid"
             ? "TLS certificate is valid and authorized"
-            : "TLS certificate is not authorized or is invalid"
+            : state === "revoked"
+              ? "TLS certificate has been revoked"
+              : state === "expired"
+                ? "TLS certificate has expired"
+                : state === "not-yet-valid"
+                  ? "TLS certificate is not yet valid"
+                  : "TLS certificate is not authorized or is invalid"
         };
 
         socket.end();
@@ -468,7 +504,16 @@ app.post("/check", async (req, res) => {
       reasons.push("Domain age could not be verified");
     }
 
-    if (!tls.authorized) {
+    if (!isHttps(url)) {
+      score += 60;
+      reasons.push("Website is using plain HTTP instead of HTTPS");
+    } else if (tls.status === "revoked") {
+      score += 80;
+      reasons.push("TLS certificate has been revoked");
+    } else if (tls.status === "expired" || tls.status === "not-yet-valid") {
+      score += 65;
+      reasons.push(tls.reason || "TLS certificate is expired or not yet valid");
+    } else if (!tls.authorized) {
       score += 40;
       reasons.push("TLS certificate is invalid or unauthorized");
     } else if (!tls.hostnameMatch) {
