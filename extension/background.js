@@ -42,6 +42,30 @@ function isCheckableUrl(url) {
   return true;
 }
 
+function isPrivateOrLocalIpHostname(hostname) {
+  if (!hostname) return false;
+  if (hostname === "localhost") return true;
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return false;
+
+  const [a, b] = hostname.split(".").map(Number);
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+function hasStandaloneDangerToken(hostname) {
+  if (!hostname) return false;
+
+  const suspiciousTokens = [
+    "login", "secure", "account", "verify", "update", "billing",
+    "confirm", "security", "support", "wallet", "payment"
+  ];
+
+  const parts = hostname.toLowerCase().replace(/^www\./, "").split(/[.-]/).filter(Boolean);
+  return suspiciousTokens.some((token) => parts.includes(token));
+}
+
 function shouldBlockWarning(verdict, isVerified = true, url = "", isUserAllowed = false) {
   if (!isVerified) return false;
   if (isUserAllowed) return false;
@@ -51,7 +75,12 @@ function shouldBlockWarning(verdict, isVerified = true, url = "", isUserAllowed 
     return true;
   }
 
-  return /^http:\/\//i.test(String(url || ""));
+  const hostname = getHostname(url);
+  if (hostname && /^\d+\.\d+\.\d+\.\d+$/.test(hostname) && !isPrivateOrLocalIpHostname(hostname)) {
+    return true;
+  }
+
+  return /^http:\/\//i.test(String(url || "")) && !isPrivateOrLocalIpHostname(hostname || "");
 }
 
 function getFastDangerIndicators(url) {
@@ -64,7 +93,7 @@ function getFastDangerIndicators(url) {
     return null;
   }
 
-  if (/^http:\/\//i.test(url)) {
+  if (/^http:\/\//i.test(url) && !isPrivateOrLocalIpHostname(hostname)) {
     return {
       verdict: "dangerous",
       score: 70,
@@ -80,16 +109,15 @@ function getFastDangerIndicators(url) {
     };
   }
 
-  if (/\d+\.\d+\.\d+\.\d+/.test(hostname)) {
+  if (/\d+\.\d+\.\d+\.\d+/.test(hostname) && !isPrivateOrLocalIpHostname(hostname)) {
     return {
       verdict: "dangerous",
       score: 80,
-      reasons: ["IP address used instead of a normal hostname"]
+      reasons: ["Public IP address used instead of a normal hostname"]
     };
   }
 
-  const suspiciousTokens = ["login", "secure", "account", "verify", "update", "billing", "confirm", "security", "support", "wallet", "payment"];
-  if (suspiciousTokens.some((token) => hostname.includes(token))) {
+  if (hasStandaloneDangerToken(hostname)) {
     return {
       verdict: "caution",
       score: 45,

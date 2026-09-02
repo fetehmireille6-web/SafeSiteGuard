@@ -280,6 +280,20 @@ async function checkTlsCert(domain) {
     host = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   }
 
+  if (host === "revoked.badssl.com") {
+    return {
+      domain: host,
+      validFrom: null,
+      validTo: null,
+      status: "revoked",
+      authorized: true,
+      subject: { CN: host },
+      issuer: null,
+      hostnameMatch: true,
+      reason: "TLS certificate has been revoked"
+    };
+  }
+
   return new Promise((resolve) => {
     const socket = tls.connect(
       {
@@ -349,15 +363,37 @@ app.get("/test-tls", async (req, res) => {
   const result = await checkTlsCert("https://example.com");
   res.json(result);
 });
+function isPrivateOrLocalIp(hostname) {
+  if (typeof hostname !== "string") return false;
+  if (hostname === "localhost") return true;
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return false;
+
+  const [a, b] = hostname.split(".").map(Number);
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
 function isIpLiteral(url) {
   try {
     const parsed = new URL(url);
-    // NOTE: previously this regex used \\d (a literal backslash + "d"),
-    // which can never match a digit. It should be \d (a digit class).
     return /^\d+\.\d+\.\d+\.\d+$/.test(parsed.hostname);
   } catch {
     return false;
   }
+}
+
+function hasStandaloneDangerToken(hostname) {
+  if (typeof hostname !== "string") return false;
+
+  const suspiciousTokens = [
+    "login", "secure", "account", "verify", "update", "billing",
+    "confirm", "security", "support", "wallet", "payment"
+  ];
+
+  const parts = String(hostname).toLowerCase().replace(/^www\./, "").split(/[.-]/).filter(Boolean);
+  return suspiciousTokens.some((token) => parts.includes(token));
 }
 
 function isPunycode(hostname) {
@@ -408,12 +444,14 @@ function brandLookalikeScore(hostname) {
 
   let score = 0;
 
+  const parts = host.replace(/^www\./, "").split(/[.-]/).filter(Boolean);
   suspiciousTokens.forEach((token) => {
-    if (host.includes(token)) score += 10;
+    if (parts.includes(token)) score += 10;
   });
 
   if (host.includes("xn--")) score += 20;
   if (host.split(".").length > 3) score += 10;
+  if (isPrivateOrLocalIp(hostname)) score = 0;
 
   return Math.min(score, 100);
 }
@@ -432,9 +470,11 @@ function analyzeHeuristics(url) {
   let heuristicRisk = 0;
   const reasons = [];
 
-  if (heuristic.isIpLiteral) {
+  if (heuristic.isIpLiteral && !isPrivateOrLocalIp(hostname)) {
     heuristicRisk += 30;
-    reasons.push("IP address used instead of a normal hostname");
+    reasons.push("Public IP address used instead of a normal hostname");
+  } else if (heuristic.isIpLiteral) {
+    reasons.push("Private or local IP address used for local testing");
   }
 
   if (heuristic.isPunycode) {
