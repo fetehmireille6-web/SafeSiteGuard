@@ -4,24 +4,43 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const app = express();
 
-// CORS lockdown: only allow the extension origin
-const ALLOWED_ORIGINS = [
-  `chrome-extension://${process.env.EXTENSION_ID || "*"}` // set EXTENSION_ID after first load
-];
+function isAllowedOrigin(origin) {
+  if (!origin || origin === "null") return true;
+
+  if (process.env.EXTENSION_ID) {
+    return origin === `chrome-extension://${process.env.EXTENSION_ID}`;
+  }
+
+  return /^chrome-extension:\/\/[-a-z0-9]{32,}$/i.test(origin);
+}
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    if (isAllowedOrigin(origin)) return callback(null, true);
     callback(new Error("Not allowed by CORS"));
-  }
+  },
+  credentials: false
 }));
 app.options(/.*/, cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    if (isAllowedOrigin(origin)) return callback(null, true);
     callback(new Error("Not allowed by CORS"));
-  }
+  },
+  credentials: false
 }));
 app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.json({
+    ok: true,
+    service: "SafeSite Guard backend",
+    message: "Backend is running"
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.json({ ok: true, status: "healthy" });
+});
 
 // Rate limiting: 30 requests per minute per IP
 app.use("/check", rateLimit({
