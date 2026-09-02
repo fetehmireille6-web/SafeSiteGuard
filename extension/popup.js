@@ -31,7 +31,7 @@ async function loadResult() {
     let result = (await chrome.storage.session.get(sessionKey))[sessionKey];
 
     if (!result || !result.verdict) {
-      const response = await fetch('http://localhost:3000/check', {
+      const response = await fetch(`${SAFESITE_CONFIG.BACKEND_URL}/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: tab.url })

@@ -1,3 +1,5 @@
+importScripts("config.js");
+
 const BADGE_COLORS = {
   safe: "#16a34a",
   caution: "#d97706",
@@ -202,7 +204,7 @@ async function checkUrlForTab(tabId, url) {
   }
 
   try {
-    const response = await fetch("http://localhost:3000/check", {
+    const response = await fetch(`${SAFESITE_CONFIG.BACKEND_URL}/check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url })

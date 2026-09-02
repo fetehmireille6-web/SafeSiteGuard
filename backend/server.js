@@ -1,14 +1,35 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 const app = express();
 
+// CORS lockdown: only allow the extension origin
+const ALLOWED_ORIGINS = [
+  `chrome-extension://${process.env.EXTENSION_ID || "*"}` // set EXTENSION_ID after first load
+];
+
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error("Not allowed by CORS"));
+  }
 }));
-app.options(/.*/, cors({ origin: true, credentials: true }));
+app.options(/.*/, cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error("Not allowed by CORS"));
+  }
+}));
 app.use(express.json());
+
+// Rate limiting: 30 requests per minute per IP
+app.use("/check", rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false
+}));
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   const controller = new AbortController();
@@ -18,6 +39,16 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+// Safe logging: strip query strings from URLs to avoid exposing sensitive data
+function safeLogUrl(url) {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.hostname}${u.pathname}`;
+  } catch {
+    return "invalid-url";
   }
 }
 
@@ -452,12 +483,36 @@ function dedupe(list) {
 app.post("/check", async (req, res) => {
   const url = req.body && req.body.url;
 
-  if (!url) {
+  // Input validation: check type and length
+  if (typeof url !== "string" || url.length > 2048) {
     return res.status(400).json({
       url: null,
       score: 0,
       verdict: "caution",
-      reasons: ["No URL was provided"]
+      reasons: ["Invalid URL: must be a string under 2048 characters"]
+    });
+  }
+
+  // Validate URL format
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return res.status(400).json({
+      url: null,
+      score: 0,
+      verdict: "caution",
+      reasons: ["Malformed URL"]
+    });
+  }
+
+  // Validate protocol
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return res.status(400).json({
+      url: null,
+      score: 0,
+      verdict: "caution",
+      reasons: ["Unsupported protocol"]
     });
   }
 
